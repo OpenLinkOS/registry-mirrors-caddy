@@ -7,14 +7,14 @@ source .env
 CADDY_SERVICE_FILE="/lib/systemd/system/caddy.service"
 
 # 构建新的 Environment 行内容
-    local new_env="Environment=\"DOMAIN=$DOMAIN\" \"HOSTNAME=$HOSTNAME\" \"DNS_API_TOKEN=$DNS_API_TOKEN\""
+new_env="Environment=\"DOMAIN=$DOMAIN\" \"HOSTNAME=$HOSTNAME\" \"DNS_API_TOKEN=$DNS_API_TOKEN\""
 
-    # 检查并更新或添加 Environment 行
-    if grep -q "Environment=" "$CADDY_SERVICE_FILE"; then
-        sed -i "/Environment=/c\\$new_env" "$CADDY_SERVICE_FILE"
-    else
-        sed -i "/\[Service\]/a $new_env" "$CADDY_SERVICE_FILE"
-    fi
+# 检查并更新或添加 Environment 行
+if grep -q "Environment=" "$CADDY_SERVICE_FILE"; then
+    sed -i "/Environment=/c\\$new_env" "$CADDY_SERVICE_FILE"
+else
+    sed -i "/\[Service\]/a $new_env" "$CADDY_SERVICE_FILE"
+fi
 
 # 重新加载 Systemd 守护进程
 if systemctl daemon-reload; then
