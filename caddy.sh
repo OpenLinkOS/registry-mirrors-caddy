@@ -1,0 +1,241 @@
+source ./.env.sh
+
+# Caddy 的 Systemd 服务文件路径
+CADDY_SERVICE_FILE="/lib/systemd/system/caddy.service"
+
+# 检查并更新或添加 Environment 行
+if grep -q "Environment=\"DOMAIN=" $CADDY_SERVICE_FILE; then
+    sed -i "/Environment=\"DOMAIN=/c\Environment=\"DOMAIN=$DOMAIN\" \"HOSTNAME=$HOSTNAME\"" $CADDY_SERVICE_FILE
+else
+    sed -i "/\[Service\]/a Environment=\"DOMAIN=$DOMAIN\" \"HOSTNAME=$HOSTNAME\"" $CADDY_SERVICE_FILE
+fi
+systemctl daemon-reload
+
+# 下载 linkos 的 favicon
+mkdir -p /var/www/static
+wget -O /var/www/static/favicon.ico https://i.imglab.cc/6586fd5967a7f.ico
+chmod 644 /var/www/static/favicon.ico
+
+# 生成 Caddyfile 配置文件
+cat << 'EOF' > /etc/caddy/Caddyfile
+{
+  servers {
+    metrics
+  }
+}
+
+(LOG) {
+  log {
+    level info
+    output file /var/log/caddy/access.log {
+      roll_size 1gb
+      roll_keep 5
+      roll_keep_for 720h
+    }
+    # format transform `{request>remote_ip} - {request>user_id} [{ts}] "{request>method} {request>uri} {request>proto}" {status} {size} "{request>headers>Referer>[0]}" "{request>headers>User-Agent>[0]}"`{
+    #   time_format "02/Jan/2006:15:04:05 -0700"
+    # }
+  }
+}
+
+(GENERAL_SETTINGS) {
+  encode gzip
+
+  @root path /
+  respond @root "ok!" 200
+
+  @favicon path /favicon.ico
+  route @favicon {
+    root * /var/www/static/
+    file_server
+  }
+}
+
+*.{$DOMAIN} {$DOMAIN} {
+  import LOG
+
+  tls {
+    dns cloudflare {$DNS_API_TOKEN}
+  }
+
+  @metrics host {$HOSTNAME}.{$DOMAIN}
+	handle @metrics {
+    import GENERAL_SETTINGS
+    metrics /metrics
+	}
+
+  @docker host docker.{$DOMAIN}
+  handle @docker {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://registry-1.docker.io {
+      header_up Host registry-1.docker.io
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie registry-1.docker.io docker.{$DOMAIN}
+      header_down Www-Authenticate "Bearer realm=\"https://docker-auth.{$DOMAIN}/token\",service=\"registry.docker.io\""
+      header_down Location "https://production.cloudflare.docker.com" "https://docker-storage.{$DOMAIN}"
+    }
+  }
+
+  @docker-auth host docker-auth.{$DOMAIN}
+  handle @docker-auth {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://auth.docker.io {
+      header_up Host auth.docker.io
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie auth.docker.io docker.{$DOMAIN}
+    }
+  }
+
+  @docker-storage host docker-storage.{$DOMAIN}
+  handle @docker-storage {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://production.cloudflare.docker.com {
+      header_up Host production.cloudflare.docker.com
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie production.cloudflare.docker.com docker-storage.{$DOMAIN}
+    }
+  }
+
+  @quay host quay.{$DOMAIN}
+  handle @quay {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://quay.io {
+      header_up Host quay.io
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie quay.io quay.{$DOMAIN}
+      header_down Www-Authenticate "Bearer realm=\"https://quay.{$DOMAIN}/v2/auth\",service=\"quay.io\""
+      header_down Location "^https://cdn[0-9]*\.quay\.io" "https://quay-storage.{$DOMAIN}"
+    }
+  }
+
+  @quay-storage host quay-storage.{$DOMAIN}
+  handle @quay-storage {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://cdn03.quay.io {
+      header_up Host cdn03.quay.io
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie cdn03.quay.io quay-storage.{$DOMAIN}
+    }
+  }
+
+  @gcr host gcr.{$DOMAIN}
+  handle @gcr {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://gcr.io {
+      header_up Host gcr.io
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie gcr.io gcr.{$DOMAIN}
+      header_down Www-Authenticate "Bearer realm=\"https://gcr.{$DOMAIN}/v2/token\",service=\"gcr.io\""
+      header_down Location "https://storage.googleapis.com" "https://gcr-storage.{$DOMAIN}"
+    }
+  }
+
+  @gcr-storage host gcr-storage.{$DOMAIN}
+  handle @gcr-storage {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://storage.googleapis.com {
+      header_up Host storage.googleapis.com
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie storage.googleapis.com gcr-storage.{$DOMAIN}
+    }
+  }
+
+  @ghcr host ghcr.{$DOMAIN}
+  handle @ghcr {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://ghcr.io {
+      header_up Host ghcr.io
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie ghcr.io ghcr.{$DOMAIN}
+      header_down Www-Authenticate "Bearer realm=\"https://ghcr.{$DOMAIN}/token\",service=\"ghcr.io\""
+      header_down Location "https://pkg-containers.githubusercontent.com" "https://ghcr-storage.{$DOMAIN}"
+    }
+  }
+
+  @ghcr-storage host ghcr-storage.{$DOMAIN}
+  handle @ghcr-storage {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://pkg-containers.githubusercontent.com {
+      header_up Host pkg-containers.githubusercontent.com
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie pkg-containers.githubusercontent.com ghcr-storage.{$DOMAIN}
+    }
+  }
+
+  @k8s host k8s.{$DOMAIN}
+  handle @k8s {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://registry.k8s.io {
+      header_up Host registry.k8s.io
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie registry.k8s.io k8s.{$DOMAIN}
+      header_down Www-Authenticate "Bearer realm=\"https://k8s.{$DOMAIN}/v2/token\",service=\"registry.k8s.io\""
+      header_down Location "^https://[a-zA-Z0-9-]+.docker.pkg.dev" "https://k8s-storage-gcr.{$DOMAIN}"
+      header_down Location "^https://[a-zA-Z0-9-]+.s3.dualstack.[a-zA-Z0-9-]+.amazonaws.com" "https://k8s-storage-aws.{$DOMAIN}"
+    }
+  }
+
+  @k8s-storage-gcr host k8s-storage-gcr.{$DOMAIN}
+  handle @k8s-storage-gcr {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://us-west1-docker.pkg.dev {
+      header_up Host us-west1-docker.pkg.dev
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie us-west1-docker.pkg.dev k8s-storage-gcr.{$DOMAIN}
+    }
+  }
+
+  @k8s-storage-aws host k8s-storage-aws.{$DOMAIN}
+  handle @k8s-storage-aws {
+    import GENERAL_SETTINGS
+    reverse_proxy * https://prod-registry-k8s-io-us-west-1.s3.dualstack.us-west-1.amazonaws.com {
+      header_up Host prod-registry-k8s-io-us-west-1.s3.dualstack.us-west-1.amazonaws.com
+      header_up X-Real-IP {http.request.remote.host}
+      header_up X-Forwarded-For {http.request.remote.host}
+      header_up X-Forwarded-Port {http.request.port}
+      header_up X-Forwarded-Proto {http.request.scheme}
+      header_down Set-Cookie prod-registry-k8s-io-us-west-1.s3.dualstack.us-west-1.amazonaws.com k8s-storage-aws.{$DOMAIN}
+    }
+  }
+
+  # Fallback for otherwise unhandled domains
+  handle {
+    respond "404 Not Found" 404
+  }
+}
+EOF
+
+systemctl restart caddy
