@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # 安装 caddy
 # 参考文档：https://caddyserver.com/docs/install
 # 下方为 debian 系统安装命令
