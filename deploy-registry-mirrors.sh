@@ -1,4 +1,4 @@
-source ./.env.sh
+source ./.env
 
 # Caddy 的 Systemd 服务文件路径
 CADDY_SERVICE_FILE="/lib/systemd/system/caddy.service"
