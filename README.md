@@ -103,3 +103,23 @@ LinkOS 公益运营的镜像仓库加速服务，使用 Caddy 作为反向代理
 官方命令：docker pull registry.k8s.io/image:tag
 代理命令：docker pull k8s.linkos.org/image:tag
 ```
+
+
+
+
+
+## 部署文档
+
+本项目提供 systemd 和 docker-compose 两种搭建方式，可根据实际需要进行选择，如单台服务器只部署该镜像加速，可直接以 systemd 形式快速部署，且具有更好的性能和稳定性，如想和其他服务共用服务器推荐使用 docker-compose 方式容器化部署。
+
+
+
+### Systemd 部署
+
+➡️ [deploy-in-systemd.md](./docs/deploy-in-systemd.md)
+
+
+
+### Docker Compose 部署
+
+➡️ [deploy-in-docker-compose.md](./docs/deploy-in-docker-compose.md)
