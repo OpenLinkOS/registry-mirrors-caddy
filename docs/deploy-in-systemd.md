@@ -52,9 +52,9 @@ systemctl disable caddy
 rm -rf /var/www/static /etc/caddy/Caddyfile /var/log/caddy
 
 # 卸载 Caddy 软件包
-apt remove --purge caddy
+apt remove --purge caddy -y
 
 # （可选）清除无用的包依赖
-apt autoremove
+# apt autoremove -y
 ```
 
