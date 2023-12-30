@@ -6,6 +6,27 @@ LinkOS 公益运营的镜像仓库加速服务，使用 Caddy 作为反向代理
 
 
 
+
+
+## 项目进展：开发中
+
+> 当前处于开发中，当前 LinkOS Registry Mirrors（Caddy）版本可能存在不稳定性，建议等待正式 release 后使用。
+
+**进行中：**
+
+1. docker 构建
+2. docker 部署文档编写
+3. 非 https 版 Caddyfile 配置改造（应对本机前方再次外挂 反代/WAF 场景，此时可无需 https）
+
+**待办：**
+
+1. 集成 GitHub Action，并支持多架构构建
+2. docker compose 部署文档编写
+
+
+
+
+
 ## 服务列表
 
 当前 LinkOS 镜像加速（Caddy 反代版）提供下面列表中的容器镜像加速服务：
@@ -110,13 +131,19 @@ LinkOS 公益运营的镜像仓库加速服务，使用 Caddy 作为反向代理
 
 ## 部署文档
 
-本项目提供 systemd 和 docker-compose 两种搭建方式，可根据实际需要进行选择，如单台服务器只部署该镜像加速，可直接以 systemd 形式快速部署，且具有更好的性能和稳定性，如想和其他服务共用服务器推荐使用 docker-compose 方式容器化部署。
+本项目提供 systemd、docker、docker-compose 三种搭建方式，可根据实际需要进行选择，如单台服务器只部署该镜像加速，可直接以 systemd 形式快速部署，且具有更好的性能和稳定性，如想和其他服务共用服务器推荐使用 docker 或 docker-compose 方式容器化部署。
 
 
 
 ### Systemd 部署
 
 ➡️ [deploy-in-systemd.md](./docs/deploy-in-systemd.md)
+
+
+
+### Docker 部署
+
+➡️ [deploy-in-docker.md](./docs/deploy-in-docker.md)
 
 
 
