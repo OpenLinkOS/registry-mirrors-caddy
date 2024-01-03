@@ -14,10 +14,9 @@ FROM caddy:latest
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
-RUN mkdir -p /var/www/static /data/logs
+RUN mkdir -p /var/www/static /var/log/caddy
 
 COPY caddy/Caddyfile /etc/caddy/Caddyfile
 COPY caddy/static/favicon.ico /var/www/static/favicon.ico
 
-ENV LOG_FILE=/data/logs/caddy.log
 EXPOSE 80 443
